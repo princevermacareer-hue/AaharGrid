@@ -1,0 +1,172 @@
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">A</span><div><strong>AaharGrid</strong><small>Share food. Share hope.</small></div></div>
+  @if (config?.demo) {
+    <label>Demo role
+      <select aria-label="Demo role" [ngModel]="demoRole" (ngModelChange)="switchDemoRole($event)">
+        <option value="donor">Donor</option><option value="recipient">Recipient</option><option value="volunteer">Volunteer</option><option value="admin">Administrator</option>
+      </select>
+    </label>
+  } @else if (token) { <button class="button ghost" (click)="logout()">Sign out</button> }
+</header>
+
+<main class="shell">
+  @if (config?.demo) { <div class="notice">Local demo mode: login is disabled and all data is simulated. Do not use for real donations.</div> }
+  @if (error) { <div class="notice error" role="alert">{{ error }}</div> }
+  @if (message) { <div class="notice success" role="status">{{ message }}</div> }
+  @if (loading) {
+    <p class="muted">Loading your workspace...</p>
+  } @else if (!token) {
+    <section class="hero">
+      <div>
+        <span class="eyebrow">A SMARTER WAY TO SHARE</span>
+        <h1>Good food belongs<br><em>on the table.</em></h1>
+        <p>Connect surplus food with the communities who need it. AaharGrid helps donors, organizations and volunteers coordinate every step.</p>
+        <button class="button primary" (click)="login()" [disabled]="!config">Sign in or create an account →</button>
+        <p class="caption">Secure sign-in, registration and password recovery are managed by Amazon Cognito.</p>
+      </div>
+      <div class="hero-card"><span class="hero-icon">✳</span><h2>Small actions.<br>Greater impact.</h2><p>List surplus, coordinate a pickup, and give good food a second chance.</p><div class="hero-tags"><span>DONATE</span><span>CONNECT</span><span>REDISTRIBUTE</span></div></div>
+    </section>
+    <section class="feature-grid">
+      <article><span>01</span><h3>Share surplus</h3><p>Donors publish the food and pickup details that matter.</p></article>
+      <article><span>02</span><h3>Find a match</h3><p>Eligible organizations discover opportunities that fit their needs.</p></article>
+      <article><span>03</span><h3>Make it happen</h3><p>Volunteers and recipients coordinate collection and delivery.</p></article>
+    </section>
+  } @else if (!profile) {
+    <section class="panel narrow">
+      <span class="eyebrow">WELCOME TO AAHARGRID</span><h1>Tell us about yourself</h1>
+      <p class="muted">Your profile will be reviewed before you can use the platform.</p>
+      <form (ngSubmit)="register()" #registerForm="ngForm" class="form-grid">
+        <label>Name <input name="name" [(ngModel)]="registration.name" required maxlength="300"></label>
+        <label>I am a <select name="role" [(ngModel)]="registration.role"><option value="donor">Food donor</option><option value="recipient">Recipient organization</option><option value="volunteer">Volunteer</option></select></label>
+        <label>Organization <input name="organization" [(ngModel)]="registration.organization" [required]="registration.role !== 'volunteer'"></label>
+        <label>Address <input name="address" [(ngModel)]="registration.address"></label>
+        <button class="button primary" [disabled]="busy || registerForm.invalid">Submit profile</button>
+      </form>
+    </section>
+  } @else {
+    <div class="workspace-heading"><div><span class="eyebrow">YOUR WORKSPACE</span><h1>Hello, {{ profile.name }}.</h1><p class="muted">{{ profile.organization || 'AaharGrid volunteer' }} · {{ profile.role | titlecase }}</p></div><span class="badge">{{ profile.status }}</span></div>
+    @if (profile.status !== 'approved') {
+      <div class="notice">Your profile is {{ profile.status }}. An administrator must approve your account before you can participate.</div>
+    }
+    <nav class="tabs" aria-label="Workspace sections">
+      <button (click)="tab='overview'" [class.active]="tab==='overview'">Overview</button>
+      @if (profile.status === 'approved' && profile.role !== 'volunteer') {
+        <button (click)="tab='listings'" [class.active]="tab==='listings'">{{ profile.role === 'recipient' ? 'Find food' : 'Listings' }}</button>
+        <button (click)="tab='requests'" [class.active]="tab==='requests'">Requests</button>
+      }
+      @if (profile.status === 'approved' && profile.role !== 'donor') { <button (click)="tab='pickups'" [class.active]="tab==='pickups'">Pickups</button> }
+      @if (profile.status === 'approved' && profile.role === 'admin') { <button (click)="tab='admin'" [class.active]="tab==='admin'">Administration</button> }
+      <button (click)="tab='profile'" [class.active]="tab==='profile'">Profile</button>
+      <button (click)="tab='notifications'" [class.active]="tab==='notifications'">Notifications ({{ notifications.length }})</button>
+    </nav>
+
+    @if (tab === 'overview') {
+      <div class="section-title"><div><span class="eyebrow">AT A GLANCE</span><h2>Your impact dashboard</h2></div></div>
+      @if (overview) {
+        <div class="stats"><article><span>Requests</span><strong>{{ overview.requests }}</strong></article><article><span>Awaiting decision</span><strong>{{ overview.pending }}</strong></article><article><span>Confirmed receipts</span><strong>{{ overview.completed }}</strong></article></div>
+      }
+      <div class="panel safety"><h3>Food safety comes first</h3><p>AaharGrid does not certify food safety. Donors and recipients remain responsible for assessing suitability, safe storage, handling, transport and timely distribution.</p></div>
+      <p class="caption">Dashboard figures reflect application records. Any demonstration records are simulated, not evidence of real-world redistribution.</p>
+    }
+    @if (tab === 'profile') {
+      <section class="panel"><div class="section-title"><div><span class="eyebrow">ACCOUNT</span><h2>Profile & preferences</h2></div></div>
+        <form (ngSubmit)="saveProfile()" #profileForm="ngForm" class="form-grid">
+          <label>Name <input name="name" [(ngModel)]="profile.name" required></label>
+          <label>Organization <input name="organization" [(ngModel)]="profile.organization"></label>
+          <label>Address <input name="address" [(ngModel)]="profile.address"></label>
+          @if (profile.status === 'approved' && profile.role !== 'admin') { <p class="caption wide">Contact an administrator to change the organization on an approved profile.</p> }
+          @if (profile.role === 'recipient') {
+            <label>Latitude <input name="lat" type="number" step="any" min="-90" max="90" [(ngModel)]="profile.latitude"></label>
+            <label>Longitude <input name="lng" type="number" step="any" min="-180" max="180" [(ngModel)]="profile.longitude"></label>
+            <label>Service radius (km) <input name="radius" type="number" min="1" [(ngModel)]="profile.service_radius" required></label>
+            <label>Capacity (in listing units) <input name="capacity" type="number" min="0" [(ngModel)]="profile.capacity" required></label>
+            <label>Accepted categories, comma-separated <input name="categories" [(ngModel)]="preferenceCategories" placeholder="Meals, Produce"></label>
+            <label>Accepted dietary types, comma-separated <input name="dietary" [(ngModel)]="preferenceDietary" placeholder="Vegetarian, Vegan"></label>
+            <label>Available from <input name="from" type="datetime-local" [(ngModel)]="availableFrom"></label>
+            <label>Available until <input name="until" type="datetime-local" [(ngModel)]="availableUntil"></label>
+            <label class="check"><input name="ready" type="checkbox" [(ngModel)]="profile.pickup_ready"> Ready to arrange pickup</label>
+            <p class="caption wide">Matching requires coordinates, capacity, exact category and dietary names, availability and pickup readiness. Supported categories: {{ categories.join(', ') }}. Dietary types: {{ diets.join(', ') }}.</p>
+          }
+          <button class="button primary" [disabled]="busy || profileForm.invalid">Save profile</button>
+        </form>
+      </section>
+    }
+    @if (tab === 'listings') {
+      @if (profile.role === 'donor') {
+        <section class="panel"><span class="eyebrow">OFFER FOOD</span><h2>{{ editingId ? 'Edit listing' : 'Publish a listing' }}</h2>
+          @if (editingId) { <p class="caption">Editing rejects pending requests. Allocated listings cannot be edited.</p> }
+          <form (ngSubmit)="createListing()" #listingForm="ngForm" class="form-grid">
+            <label>Food title <input name="title" [(ngModel)]="listing.title" required></label>
+            <label>Category <select name="category" [(ngModel)]="listing.category">@for (category of categories; track category) { <option [value]="category">{{ category }}</option> }</select></label>
+            <label>Dietary classification <select name="dietary" [(ngModel)]="listing.dietary">@for (diet of diets; track diet) { <option [value]="diet">{{ diet }}</option> }</select></label>
+            <label>Quantity <input name="quantity" type="number" min="0.01" step="any" [(ngModel)]="listing.quantity" required></label>
+            <label>Unit <select name="unit" [(ngModel)]="listing.unit"><option>kg</option><option>servings</option><option>items</option></select></label>
+            <label>Prepared or packed at <input name="prepared" type="datetime-local" [(ngModel)]="listing.prepared_at" required></label>
+            <label>Pickup from <input name="from" type="datetime-local" [(ngModel)]="listing.pickup_from" required></label>
+            <label>Pickup until <input name="until" type="datetime-local" [(ngModel)]="listing.pickup_until" required></label>
+            <label>Pickup address <input name="address" [(ngModel)]="listing.address" required></label>
+            <label>Latitude <input name="lat" type="number" step="any" min="-90" max="90" [(ngModel)]="listing.latitude" required></label>
+            <label>Longitude <input name="lng" type="number" step="any" min="-180" max="180" [(ngModel)]="listing.longitude" required></label>
+            <label>Storage and handling <input name="storage" [(ngModel)]="listing.storage" required></label>
+            <label>Packaging details <input name="packaging" [(ngModel)]="listing.packaging" required></label>
+            <label class="check wide"><input name="safety" type="checkbox" [(ngModel)]="listing.safety_declaration" required> I declare that this food is suitable for donation and understand that I remain responsible for food safety.</label>
+            <div class="inline"><button class="button primary" [disabled]="busy || listingForm.invalid">{{ editingId ? 'Save listing' : 'Publish listing' }}</button>@if (editingId) { <button type="button" class="button secondary" (click)="cancelEdit()">Cancel</button> }</div>
+          </form>
+        </section>
+      }
+      <div class="section-title"><div><span class="eyebrow">FOOD OPPORTUNITIES</span><h2>{{ profile.role === 'recipient' ? 'Recommended for you' : 'Listings' }}</h2></div></div>
+      @if (!listings.length) { <div class="empty">No listings to show. @if (profile.role === 'recipient') { Complete your matching preferences and availability in your profile. }</div> }
+      <div class="cards">
+        @for (l of listings; track l.id) {
+          <article class="card"><div class="card-top"><span class="tag">{{ l.category }}</span><span class="badge">{{ l.status }}</span></div><h3>{{ l.title }}</h3>
+            <p>{{ l.remaining ?? l.quantity }} {{ l.unit }} available · {{ l.dietary }}</p><p class="muted">Pickup by {{ l.pickup_until | date:'medium' }}</p>
+            <p class="caption">Storage: {{ l.storage }} · Packaging: {{ l.packaging }}</p>
+            @if (l.score !== undefined) { <p class="match">Match score {{ l.score }}/100</p> }
+            @if (profile.role === 'recipient') { <div class="inline"><input aria-label="Requested quantity" type="number" min="0.01" step="any" [(ngModel)]="requestQuantities[l.id]" placeholder="Quantity"><button class="button primary" [disabled]="busy" (click)="requestListing(l.id)">Request</button></div> }
+            @if ((profile.role === 'donor' || profile.role === 'admin') && l.status === 'available') { <div class="inline">@if (profile.role === 'donor') { <button class="button secondary" [disabled]="busy" (click)="editListing(l)">Edit</button> }<button class="button secondary" [disabled]="busy" (click)="closeListing(l.id)">Close listing</button><button class="button secondary" (click)="showMatches(l.id)">Find matches</button></div> }
+            @if (matchesFor === l.id) { <div><h3>Eligible recipients</h3>@for (m of matches; track m.id) { <p>{{ m.organization }} · {{ m.score }}/100</p> } @empty { <p class="muted">No eligible recipients found.</p> }</div> }
+          </article>
+        }
+      </div>
+    }
+    @if (tab === 'requests') {
+      <div class="section-title"><div><span class="eyebrow">COORDINATION</span><h2>Donation requests</h2></div></div>
+      @if (!requests.length) { <div class="empty">No requests yet.</div> }
+      <div class="cards">@for (r of requests; track r.id) {
+        <article class="card"><div class="card-top"><span class="tag">REQUEST #{{ r.id }}</span><span class="badge">{{ r.status }}</span></div><h3>{{ r.title }}</h3><p>{{ r.quantity }} {{ r.unit }} · {{ r.recipient }}</p><p class="muted">Pickup by {{ r.pickup_until | date:'medium' }}</p>
+          @if (profile.role === 'donor' && r.status === 'pending') { <div class="inline"><button class="button primary" [disabled]="busy" (click)="decide(r.id, 'accepted')">Accept</button><button class="button secondary" [disabled]="busy" (click)="decide(r.id, 'rejected')">Reject</button></div> }
+          @if ((profile.role === 'recipient' || profile.role === 'admin') && r.status === 'accepted') {
+            <div class="inline"><select aria-label="Select volunteer" [(ngModel)]="volunteerChoices[r.id]"><option [ngValue]="undefined">Select volunteer</option>@for (v of volunteers; track v.id) { <option [ngValue]="v.id">{{ v.name }}</option> }</select><button class="button secondary" [disabled]="busy || !volunteerChoices[r.id]" (click)="assign(r.id)">Assign</button></div>
+          }
+          @if (profile.role === 'recipient' && r.status === 'accepted') { <div class="inline"><input aria-label="Received quantity" type="number" min="0.01" step="any" [(ngModel)]="receiptQuantities[r.id]" placeholder="Received quantity"><button class="button primary" [disabled]="busy" (click)="receipt(r.id)">Confirm receipt</button></div> }
+        </article>
+      }</div>
+    }
+    @if (tab === 'pickups') {
+      <div class="section-title"><div><span class="eyebrow">ON THE MOVE</span><h2>Pickup assignments</h2></div></div>
+      @if (!assignments.length) { <div class="empty">No pickups assigned yet.</div> }
+      <div class="cards">@for (a of assignments; track a.id) {
+        <article class="card"><div class="card-top"><span class="tag">PICKUP #{{ a.id }}</span><span class="badge">{{ a.status }}</span></div><h3>{{ a.title }}</h3><p>{{ a.quantity }} {{ a.unit }} · {{ a.volunteer }}</p><p>{{ a.address }}</p><p class="muted">Pickup by {{ a.pickup_until | date:'medium' }}</p>
+          @if (profile.role === 'volunteer') { <div class="inline">
+            @if (a.status === 'assigned') { <button class="button primary" [disabled]="busy" (click)="transition(a.id, 'accepted')">Accept task</button> }
+            @if (a.status === 'accepted') { <button class="button primary" [disabled]="busy" (click)="transition(a.id, 'picked_up')">Picked up</button> }
+            @if (a.status === 'picked_up') { <button class="button primary" [disabled]="busy" (click)="transition(a.id, 'delivered')">Delivered</button> }
+            @if (a.status === 'assigned' || a.status === 'accepted' || a.status === 'picked_up') { <button class="button secondary" [disabled]="busy" (click)="transition(a.id, 'failed')">Report failure</button> }
+          </div> }
+        </article>
+      }</div>
+    }
+    @if (tab === 'notifications') {
+      <div class="section-title"><div><span class="eyebrow">UPDATES</span><h2>Notifications</h2></div></div>
+      @if (!notifications.length) { <div class="empty">You're all caught up.</div> }
+      @for (n of notifications; track n.id) { <article class="notification"><div><strong>{{ n.message }}</strong><p class="caption">{{ n.created_at | date:'medium' }} · {{ n.read_at ? 'Read' : 'Unread' }}</p></div>@if (!n.read_at) { <button class="button secondary" (click)="readNotification(n.id)">Mark read</button> }</article> }
+    }
+    @if (tab === 'admin') {
+      <div class="section-title"><div><span class="eyebrow">PLATFORM OVERSIGHT</span><h2>Review accounts</h2></div></div>
+      @for (u of users; track u.id) { <article class="notification"><div><strong>{{ u.name }} · {{ u.role }}</strong><p class="caption">{{ u.organization }} · {{ u.status }}</p></div>@if (u.role !== 'admin') { <div class="inline"><button class="button primary" (click)="review(u.id,'approved')">Approve</button><button class="button secondary" (click)="review(u.id,'rejected')">Reject</button></div> }</article> }
+      <div class="section-title"><div><span class="eyebrow">TRACEABILITY</span><h2>Recent audit events</h2></div></div>
+      @for (event of audit; track event.id) { <article class="notification"><div><strong>{{ event.action }} · {{ event.entity }} #{{ event.entity_id }}</strong><p class="caption">{{ event.actor }} · {{ event.created_at | date:'medium' }}</p></div></article> }
+    }
+  }
+</main>
+<footer>AAHARGRID <span>Built for a more connected food community.</span></footer>
